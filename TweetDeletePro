@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         TweetDeletePro
-// @namespace    https://github.com/bodhisunn-dev/TweetDeletePro
+// @namespace    https://github.com/bodhisunn-dev/TweetDeletePro/
 // @version      0.9.3
-// @description  Delete all your Tweets, Likes, Bookmarks, and DMs for free.
-// @author       Luca, dbort, pReya, Micolithe, STrRedWolf — Modified by bodhisunn-dev
+// @description  Delete all your Tweets for free.
+// @author       Bodhisunn-Dev
 // @license      NoHarm-draft
 // @match        https://x.com/*
 // @match        https://mobile.x.com/*
@@ -12,8 +12,9 @@
 // @icon         https://www.google.com/s2/favicons?domain=twitter.com
 // @grant        none
 // @run-at       document-idle
-// @homepageURL  https://github.com/bodhisunn-dev/TweetDeletePro
-// @supportURL   https://github.com/bodhisunn-dev/TweetDeletePro/issues
+// @downloadURL  https://update.greasyfork.org/scripts/476062/TweetXer.user.js
+// @updateURL    https://update.greasyfork.org/scripts/476062/TweetXer.meta.js
+// @supportURL   https://github.com/lucahammer/tweetXer/issues
 // ==/UserScript==
 
 (function () {
@@ -62,13 +63,13 @@
         },
 
         updateTransactionId() {
+            // random string
             this.transaction_id = [...crypto.getRandomValues(new Uint8Array(95))]
-                .map((x, i) => (i = x / 255 * 61 | 0, String.fromCharCode(i + (i > 9 ? i > 35 ? 61 : 55 : 48))))
-                .join``
+                .map((x, i) => (i = x / 255 * 61 | 0, String.fromCharCode(i + (i > 9 ? i > 35 ? 61 : 55 : 48)))).join``
         },
 
         updateTitle(text) {
-            document.getElementById('tweetsDeletePro_title').textContent = text
+            document.getElementById('tweetsXer_title').textContent = text
         },
 
         updateInfo(text) {
@@ -95,25 +96,46 @@
             if (tn.files && tn.files[0]) {
                 let fr = new FileReader()
                 fr.onloadend = function (evt) {
+                    // window.YTD.tweet_headers.part0
+                    // window.YTD.tweets.part0
+                    // window.YTD.like.part0
+                    // window.YTD.direct_message_headers.part0
                     let cutpoint = evt.target.result.indexOf('= ')
                     let filestart = evt.target.result.slice(0, cutpoint)
                     let json = JSON.parse(evt.target.result.slice(cutpoint + 1))
 
-                    if (filestart.includes('.tweet_headers.') || filestart.includes('.tweets.') || filestart.includes('.tweet.')) {
+                    if (filestart.includes('.tweet_headers.')) {
+                        console.log('File contains Tweets.')
                         TweetsDeletePro.action = 'untweet'
-                        TweetsDeletePro.tIds = json.map((x) => x.tweet.id_str || x.tweet.tweet_id)
+                        TweetsDeletePro.tIds = json.map((x) => x.tweet.tweet_id)
+                    } else if (filestart.includes('.tweets.') || filestart.includes('.tweet.')) {
+                        console.log('File contains Tweets.')
+                        TweetsDeletePro.action = 'untweet'
+                        TweetsDeletePro.tIds = json.map((x) => x.tweet.id_str)
                     } else if (filestart.includes('.like.')) {
+                        console.log('File contains Favs.')
                         TweetsDeletePro.action = 'unfav'
                         TweetsDeletePro.tIds = json.map((x) => x.like.tweetId)
-                    } else if (filestart.includes('.direct_message')) {
+                    }
+                    else if (
+                        filestart.includes('.direct_message_headers.')
+                        || filestart.includes('.direct_message_group_headers.')
+                        || filestart.includes('.direct_messages.')
+                        || filestart.includes('.direct_message_groups.')) {
+                        console.log('File contains Direct Messages.')
                         TweetsDeletePro.action = 'undm'
                         if (this.deleteDMsOneByOne) {
-                            TweetsDeletePro.tIds = json.map((c) => c.dmConversation.messages.map((m) => m.messageCreate?.id || 0)).flat().filter(Boolean)
-                        } else {
+                            TweetsDeletePro.tIds = json.map((c) => c.dmConversation.messages.map((m) => m.messageCreate ? m.messageCreate.id : 0))
+                            TweetsDeletePro.tIds = TweetsDeletePro.tIds.flat()
+                            TweetsDeletePro.tIds = TweetsDeletePro.tIds.filter((i) => i != 0)
+                        }
+                        else {
                             TweetsDeletePro.tIds = json.map((c) => c.dmConversation.conversationId)
                         }
+
                     } else {
-                        TweetsDeletePro.updateInfo('File not recognized. Use files from Twitter data export.')
+                        TweetsDeletePro.updateInfo('File content not recognized. Please use a file from the Twitter data export.')
+                        console.log('File content not recognized. Please use a file from the Twitter data export.')
                     }
 
                     if (TweetsDeletePro.action.length > 0) {
@@ -124,41 +146,51 @@
 
                     if (TweetsDeletePro.action == 'untweet') {
                         if (document.getElementById('skipCount').value.length < 1) {
+                            // If there is no amount set to skip, automatically try to skip the amount
+                            // that has been deleted already. Difference of Tweeets in file to count on profile
+                            // 5% tolerance to prevent skipping too much
                             TweetsDeletePro.skip = TweetsDeletePro.total - TweetsDeletePro.TweetCount - parseInt(TweetsDeletePro.total / 20)
                             TweetsDeletePro.skip = Math.max(0, TweetsDeletePro.skip)
-                        } else {
+                        }
+                        else {
                             TweetsDeletePro.skip = document.getElementById('skipCount').value
                         }
+                        console.log(`Skipping oldest ${TweetsXer.skip} Tweets. Use advanced options to manually set how many to skip. Enter 0 to prevent the automatic calculation.`)
                         TweetsDeletePro.tIds.reverse()
                         TweetsDeletePro.tIds = TweetsDeletePro.tIds.slice(TweetsDeletePro.skip)
                         TweetsDeletePro.dCount = TweetsDeletePro.skip
                         TweetsDeletePro.tIds.reverse()
-                        TweetsDeletePro.updateTitle(`TweetDeletePro: Deleting ${TweetsDeletePro.total} Tweets`)
-                        TweetsDeletePro.deleteTweets()
+                        TweetsDeletePro.updateTitle(`TweetDeletePro: Deleting ${TweetsXer.total} Tweets`)
 
+                        TweetsDeletePro.deleteTweets()
                     } else if (TweetsDeletePro.action == 'unfav') {
                         TweetsDeletePro.skip = document.getElementById('skipCount').value.length > 0 ? document.getElementById('skipCount').value : 0
+                        console.log(`Skipping oldest ${TweetsDeletePro.skip} Tweets`)
                         TweetsDeletePro.tIds = TweetsDeletePro.tIds.slice(TweetsDeletePro.skip)
                         TweetsDeletePro.dCount = TweetsDeletePro.skip
                         TweetsDeletePro.tIds.reverse()
-                        TweetsDeletePro.updateTitle(`TweetDeletePro: Deleting ${TweetsDeletePro.total} Likes`)
+                        TweetsDeletePro.updateTitle(`TweetDeletePro: Deleting ${TweetsDeletePro.total} Favs`)
                         TweetsDeletePro.deleteFavs()
-
                     } else if (TweetsDeletePro.action == 'undm') {
                         TweetsDeletePro.skip = document.getElementById('skipCount').value.length > 0 ? document.getElementById('skipCount').value : 0
+                        console.log(`Skipping ${TweetsDeletePro.skip} messages/convos`)
                         TweetsDeletePro.tIds = TweetsDeletePro.tIds.slice(TweetsDeletePro.skip)
                         TweetsDeletePro.dCount = TweetsDeletePro.skip
                         TweetsDeletePro.tIds.reverse()
                         if (this.deleteDMsOneByOne) {
                             TweetsDeletePro.updateTitle(`TweetDeletePro: Deleting ${TweetsDeletePro.total} DMs`)
                             TweetsDeletePro.deleteDMs()
-                        } else {
+                        }
+                        else {
                             TweetsDeletePro.updateTitle(`TweetDeletePro: Deleting ${TweetsDeletePro.total} DM Conversations`)
                             TweetsDeletePro.deleteConvos()
                         }
-                    } else {
-                        TweetsDeletePro.updateTitle(`TweetDeletePro: Unsupported file type`)
+
                     }
+                    else {
+                        TweetsDeletePro.updateTitle(`TweetDeletePro: Please try a different file`)
+                    }
+
                 }
                 fr.readAsText(tn.files[0])
             }
@@ -172,19 +204,34 @@
             div.innerHTML = `
             <style>#${this.dId}{ z-index:99999; position: sticky; top:0px; left:0px; width:auto; margin:0 auto; padding: 20px 10%; background:#87CEFA; opacity:0.9; } #${this.dId} > *{padding:5px;}</style>
             <div style="color:black">
-                <h2 class="${h2Class}" id="tweetsDeletePro_title">TweetDeletePro</h2>
-                <p id="info">Waiting for profile to load…</p>
+                <h2 class="${h2Class}" id="TweetsDeletePro_title">TweetDeletePro</h2>
+                <p id="info">Please wait for your profile to load. If this message doesn't go away after some seconds, something isn't working.</p>
                 <p id="start">
                     <input type="file" value="" id="${this.dId}_file"  />
                     <a style="color:blue" href="#" id="toggleAdvanced">Advanced Options</a>
                 <div id="advanced" style="display:none">
-                    <label for="skipCount">Skip oldest Tweets</label>
+                    <label for="skipCount">Enter how many Tweets to skip before selecting a file.</label>
                     <input id="skipCount" type="number" value="" />
-                    <p>Supported export files include Tweet headers, likes, and DM files.</p>
-                    <p><strong>Export bookmarks</strong><br><input id="exportBookmarks" type="button" value="Export Bookmarks" /></p>
-                    <p><strong>Slow delete (no export file)</strong><br><input id="slowDelete" type="button" value="Slow delete without file" /></p>
-                    <p><strong>Unfollow everyone</strong><br><input id="unfollowEveryone" type="button" value="Unfollow everyone" /></p>
-                    <p><a id="removeTweetDeletePro" style="color:blue" href="#">Remove TweetDeletePro</a></p>
+                    <p>Supported files:
+                    <ul>
+                        <li>tweet-headers.js to delete Tweets (10.000 - 20.000 per hour)</li>
+                        <li>direct-message-header.js and direct-message-group-headers.js to delete DMs (around 800 per 15 minutes)</li>
+                        <li>like.js to delete Favs (500 per 15 minutes; only works for the most recent few thousands)</li>
+                    </ul>
+                    <p><strong>Export bookmarks</strong><br>
+                        Bookmarks are not included in the official data export. You can export them here.
+                        <input id="exportBookmarks" type="button" value="Export Bookmarks" />
+                    </p>
+                    <p><strong>No tweet-headers.js?</strong><br>
+                        If you are unable to get your data export, you can use the following option.<br>
+                        This option is much slower and less reliable. It can remove at most 4000 Tweets per hour.<br>
+                        <input id="slowDelete" type="button" value="Slow delete without file" />
+                    </p>
+                    <p><strong>Unfollow everyone</strong><br>
+                        It's time to let go. This will unfollow everyone you follow.<br>
+                        <input id="unfollowEveryone" type="button" value="Unfollow everyone" />
+                    </p>
+                    <p><a id="removeTweetXer" style="color:blue" href="#">Remove TweetXer</a></p>
                     <p><small>${TweetsDeletePro.version}</small></p>
                 </div>
             </div>
@@ -192,19 +239,22 @@
             document.body.insertBefore(div, document.body.firstChild)
             document.getElementById("toggleAdvanced").addEventListener("click", (() => {
                 const adv = document.getElementById('advanced')
-                adv.style.display = adv.style.display == 'none' ? 'block' : 'none'
+                if (adv.style.display == 'none') {
+                    adv.style.display = 'block'
+                } else {
+                    adv.style.display = 'none'
+                }
             }))
             document.getElementById(`${this.dId}_file`).addEventListener("change", this.processFile, false)
             document.getElementById("exportBookmarks").addEventListener("click", this.exportBookmarks, false)
             document.getElementById("slowDelete").addEventListener("click", this.slowDelete, false)
             document.getElementById("unfollowEveryone").addEventListener("click", this.unfollow, false)
-            document.getElementById("removeTweetDeletePro").addEventListener("click", this.removeTweetDeletePro, false)
+            document.getElementById("removeTweetDeletePro").addEventListener("click", this.removeTweetXer, false)
 
         },
 
-
         async exportBookmarks() {
-            TweetsDeletePro.updateTitle('TweetXer: Exporting bookmarks')
+            TweetsDeletePro.updateTitle('TweetDeletePro: Exporting bookmarks')
             let variables = ''
             while (TweetsDeletePro.bookmarksNext.length > 0 || TweetsDeletePro.bookmarks.length == 0) {
                 if (TweetsDeletePro.bookmarksNext.length > 0) {
@@ -245,7 +295,7 @@
                         }
                     })
                     //document.getElementById('progressbar').setAttribute('value', TweetsDeletePro.dCount)
-                    TweetsDeletePro.updateInfo(`${TweetsXer.dCount} Bookmarks collected`)
+                    TweetsDeletePro.updateInfo(`${TweetsDeletePro.dCount} Bookmarks collected`)
                 } else {
                     console.log(response)
                 }
@@ -255,13 +305,13 @@
                     TweetsDeletePro.ratelimitreset = response.headers.get('x-rate-limit-reset')
                     let sleeptime = TweetsDeletePro.ratelimitreset - Math.floor(Date.now() / 1000)
                     while (sleeptime > 0) {
-                        sleeptime = TweetsXer.ratelimitreset - Math.floor(Date.now() / 1000)
+                        sleeptime = TweetsDeletePro.ratelimitreset - Math.floor(Date.now() / 1000)
                         TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsDeletePro.dCount} deleted.`)
                         await TweetsDeletePro.sleep(1000)
                     }
                 }
             }
-            let download = new Blob([JSON.stringify(TweetsXer.bookmarks)], {
+            let download = new Blob([JSON.stringify(TweetsDeletePro.bookmarks)], {
                 type: 'text/plain'
             })
             let bookmarksDownload = document.createElement("a")
@@ -270,7 +320,7 @@
             bookmarksDownload.href = window.URL.createObjectURL(download)
             bookmarksDownload.download = 'twitter-bookmarks.json'
             document.getElementById('advanced').appendChild(bookmarksDownload)
-            TweetsDeletePro.updateTitle('TweetsDeletePro')
+            TweetsXer.updateTitle('TweetDeletePro')
         },
 
         async sendRequest(
@@ -336,7 +386,7 @@
                         let sleeptime = 15
                         while (sleeptime > 0) {
                             sleeptime--
-                            TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsXer.dCount} deleted.`)
+                            TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsDeletePro.dCount} deleted.`)
                             await TweetsDeletePro.sleep(1000)
                         }
                         resolve('error')
@@ -355,7 +405,7 @@
         },
 
         async deleteFavs() {
-            this.updateTitle('TweetXer: Deleting Favs')
+            this.updateTitle('TweetDeletePro: Deleting Favs')
             // 500 unfavs per 15 Minutes
             // x-rate-limit-remaining
             // x-rate-limit-reset
@@ -365,7 +415,7 @@
                 await this.sendRequest(this.baseUrl + this.unfavURL)
             }
             this.tId = ''
-            this.updateTitle('TweetXer')
+            this.updateTitle('TweetDeletePro')
             this.updateProgressBar()
         },
 
@@ -389,7 +439,7 @@
                     "headers": {
                         "authorization": TweetsDeletePro.authorization,
                         "content-type": "application/x-www-form-urlencoded",
-                        "x-client-transaction-id": TweetsXer.transaction_id,
+                        "x-client-transaction-id": TweetsDeletePro.transaction_id,
                         "x-csrf-token": TweetsDeletePro.ct0,
                         "x-twitter-active-user": "yes",
                         "x-twitter-auth-type": "OAuth2Session"
@@ -414,19 +464,19 @@
                         let sleeptime = TweetsDeletePro.ratelimitreset - Math.floor(Date.now() / 1000)
                         while (sleeptime > 0) {
                             sleeptime = TweetsDeletePro.ratelimitreset - Math.floor(Date.now() / 1000)
-                            TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsXer.dCount} deleted.`)
-                            await TweetsXer.sleep(1000)
+                            TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsDeletePro.dCount} deleted.`)
+                            await TweetsDeletePro.sleep(1000)
                         }
                     }
                     await TweetsDeletePro.sleep(Math.floor(Math.random() * 200)) // send requests slightly slower and with random intervals
                 }
                 else if (response.status == 429 || response.status == 420) {
-                    TweetsDeletePro.tIds.push(TweetsXer.tId)
+                    TweetsDeletePro.tIds.push(TweetsDeletePro.tId)
                     console.log(`Received status code ${response.status}. Waiting before trying again.`)
                     let sleeptime = 60 * 5 // is that enough?
                     while (sleeptime > 0) {
                         sleeptime--
-                       TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsDeletePro.dCount} deleted.`)
+                        TweetsDeletePro.updateInfo(`Ratelimited. Waiting ${sleeptime} seconds. ${TweetsDeletePro.dCount} deleted.`)
                         await TweetsDeletePro.sleep(1000)
                     }
 
@@ -508,7 +558,7 @@
         async slowDelete() {
             //document.getElementById("toggleAdvanced").click()
             document.getElementById('start').remove()
-            TweetsDeletePro.total = TweetsXer.TweetCount
+            TweetsDeletePro.total = TweetsDeletePro.TweetCount
             TweetsDeletePro.createProgressBar()
 
             document.querySelectorAll('[data-testid="ScrollSnap-List"] a')[1].click()
@@ -521,7 +571,7 @@
 
                 // give the Tweets a chance to load; increase/decrease if necessary
                 // afaik the limit is 50 requests per minute
-                await TweetsXer.sleep(1200)
+                await TweetsDeletePro.sleep(1200)
 
                 // hide recommended profiles and stuff
                 document.querySelectorAll('section [data-testid="cellInnerDiv"]>div>div>div').forEach(x => x.remove())
@@ -562,7 +612,7 @@
                 // print to the console how many Tweets already got deleted
                 // Change the 100 to how often you want an update.
                 // 10 for every 10th Tweet, 1 for every Tweet, 100 for every 100th Tweet
-                if (TweetsDeletePro.dCount % 100 == 0) console.log(`${new Date().toUTCString()} Deleted ${TweetsXer.dCount} Tweets`)
+                if (TweetsDeletePro.dCount % 100 == 0) console.log(`${new Date().toUTCString()} Deleted ${TweetsDeletePro.dCount} Tweets`)
 
             }
 
@@ -590,12 +640,12 @@
                 next_unfollow.remove()
                 unfollowCount++
                 if (unfollowCount % 10 == 0) console.log(`${new Date().toUTCString()} Unfollowed ${unfollowCount} accounts`)
-                await TweetsDeletePro.sleep(Math.floor(Math.random() * 200))
+                await TweetsXer.sleep(Math.floor(Math.random() * 200))
             }
 
             console.log('No accounts left. Please reload to confirm.')
         },
-        removeTweetXer() {
+        removeTweetDeletePro() {
             document.getElementById('exportUpload').remove()
         }
     }
