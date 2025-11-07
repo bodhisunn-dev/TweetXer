@@ -1,21 +1,4 @@
-// ==UserScript==
-// @name         TweetXer
-// @namespace    https://github.com/lucahammer/tweetXer/
-// @version      0.9.3
-// @description  Delete all your Tweets for free.
-// @author       Luca,dbort,pReya,Micolithe,STrRedWolf
-// @license      NoHarm-draft
-// @match        https://x.com/*
-// @match        https://mobile.x.com/*
-// @match        https://twitter.com/*
-// @match        https://mobile.twitter.com/*
-// @icon         https://www.google.com/s2/favicons?domain=twitter.com
-// @grant        none
-// @run-at       document-idle
-// @downloadURL  https://update.greasyfork.org/scripts/476062/TweetXer.user.js
-// @updateURL    https://update.greasyfork.org/scripts/476062/TweetXer.meta.js
-// @supportURL   https://github.com/lucahammer/tweetXer/issues
-// ==/UserScript==
+
 
 (function () {
     let TweetsXer = {
